@@ -76,8 +76,8 @@ const MAX_SENSITIVITY = 5;
 // counts one ball per crossing by default — accurate and stable. Raise the Debug
 // "clump size" sliders (start low, e.g. 0.015) only to push a total toward the real
 // score, accepting some overshoot. Suggested tuned values: red 0.013, blue 0.015.
-const DEFAULT_RED_SINGLE_AREA = 0;
-const DEFAULT_BLUE_SINGLE_AREA = 0;
+const DEFAULT_RED_SINGLE_AREA = 0.008; // RED-ONLY clump multiplier (dim tube undercounts); capped by DEFAULT_RED_MAX_CLUMP
+const DEFAULT_BLUE_SINGLE_AREA = 0; // BLUE stays clean-count (verified perfect on test footage — do not change)
 // Cap on balls a single blob may represent, per gate. Kept tight on BOTH gates: an
 // uncapped cap let one noisy blob (e.g. a pre-match cluster) score 10-20 at once,
 // which caused the overshoot and pre-match false scoring. A real touching-ball burst
