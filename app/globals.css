@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0b1220;
+  --foreground: #e8edf7;
+  --ftc-red: #e4002b;
+  --ftc-red-dim: #7a1424;
+  --ftc-blue: #0072ce;
+  --ftc-blue-dim: #103a5c;
+  --panel: #121c30;
+  --panel-border: #24314a;
+
+  --scout-bg: #060907;
+  --scout-panel: #0e1512;
+  --scout-border: #232b27;
+  --scout-accent: #22ffa0;
+  --scout-accent-dim: #0d3d2a;
+  --scout-red: #ef4444;
+  --scout-blue: #3b82f6;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ftc-red: var(--ftc-red);
+  --color-ftc-blue: var(--ftc-blue);
+  --color-scout-accent: var(--scout-accent);
+  --color-scout-red: var(--scout-red);
+  --color-scout-blue: var(--scout-blue);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: radial-gradient(circle at 15% 0%, #142035 0%, var(--background) 45%);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/*
+ * Scouting wizard layout: named grid areas so the same elements (in the same
+ * DOM order, never remounted — critical for video playback continuity) can be
+ * rearranged purely with CSS between phases/breakpoints.
+ *
+ * Default (and always, on the Team Select phase): single stacked column,
+ * matching the original layout exactly.
+ *
+ * `--sidevideo` modifier (applied only on phases after Team Select) moves the
+ * video into a sticky right-hand column once there's room for it (lg+).
+ * Below that breakpoint it still falls back to the same stacked column.
+ */
+.scouting-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "header"
+    "progress"
+    "video"
+    "error"
+    "content";
+  gap: 1.25rem;
+  max-width: 36rem;
+  margin-inline: auto;
+}
+
+@media (min-width: 1024px) {
+  .scouting-layout--sidevideo {
+    max-width: 62rem;
+    grid-template-columns: 36rem 24rem;
+    column-gap: 2rem;
+    grid-template-areas:
+      "header  video"
+      "progress video"
+      "error   video"
+      "content video";
+    align-items: start;
+  }
+  .scouting-layout--sidevideo .scouting-video-slot {
+    position: sticky;
+    top: 2rem;
+  }
+}
+
+/* Small correction-action buttons in the Auto Scouting event list. */
+.chip {
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 0.2rem 0.55rem;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  transition: border-color 0.15s, color 0.15s;
+}
+.chip:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
+}
+
+.scouting-header { grid-area: header; }
+.scouting-progress { grid-area: progress; }
+.scouting-video-slot { grid-area: video; min-width: 0; }
+.scouting-error { grid-area: error; }
+.scouting-content { grid-area: content; min-width: 0; }

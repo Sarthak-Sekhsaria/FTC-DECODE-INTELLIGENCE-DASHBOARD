@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ftc-decode-predictor",
+      "runtimeExecutable": "C:\\Users\\Sarthak\\OneDrive\\Documents\\MITProject2\\.claude\\dev-server.cmd",
+      "runtimeArgs": [],
+      "port": 3000
+    }
+  ]
+}
