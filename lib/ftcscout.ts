@@ -1,11 +1,14 @@
 // Research data client for the FTCScout public API (https://ftcscout.org).
 // FTCScout aggregates official FTC Events data (matches, rankings, OPR) with no API key required.
 
+import { DECODE } from "@/lib/season";
+
 const FTCSCOUT_ENDPOINT = "https://api.ftcscout.org/graphql";
 
 // FTCScout seasons are keyed by the starting year of the school year, so the
-// 2025-2026 DECODE season is season 2025.
-export const DECODE_SEASON = 2025;
+// 2025-2026 DECODE season is season 2025. Sourced from the central season config
+// so the identifier lives in exactly one place.
+export const DECODE_SEASON = DECODE.ftcScoutSeason;
 
 const TEAM_RESEARCH_QUERY = `
   query TeamResearch($number: Int!, $season: Int!) {
@@ -125,6 +128,13 @@ export interface TeamResearch {
     teleop: number | null;
     endgame: number | null;
   };
+  // National overall-OPR value with its rank out of all ranked DECODE teams —
+  // the headline "how strong is this team" number. Null when unranked.
+  nationalOpr: {
+    value: number;
+    rank: number;
+    outOf: number;
+  } | null;
   totalWins: number;
   totalLosses: number;
   totalTies: number;
@@ -146,6 +156,7 @@ async function graphql<T>(query: string, variables: Record<string, unknown>): Pr
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query, variables }),
     cache: "no-store",
+    signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) {
     throw new Error(`FTCScout API request failed: ${res.status}`);
@@ -230,6 +241,13 @@ export async function fetchTeamResearch(
       teleop: percentile(team.quickStats?.dc, team.quickStats?.count),
       endgame: percentile(team.quickStats?.eg, team.quickStats?.count),
     },
+    nationalOpr: team.quickStats
+      ? {
+          value: round1(team.quickStats.tot.value),
+          rank: team.quickStats.tot.rank,
+          outOf: team.quickStats.count,
+        }
+      : null,
     totalWins,
     totalLosses,
     totalTies,

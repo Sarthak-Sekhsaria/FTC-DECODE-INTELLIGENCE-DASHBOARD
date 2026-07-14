@@ -5,18 +5,22 @@ function ToolCard({
   title,
   description,
   accent,
+  cta = "Open",
 }: {
   href: string;
   title: string;
   description: string;
-  accent: "red" | "blue";
+  accent: "red" | "blue" | "cyan";
+  cta?: string;
 }) {
-  const color = accent === "red" ? "var(--ftc-red)" : "var(--ftc-blue)";
+  const color = accent === "red" ? "var(--ftc-red)" : accent === "cyan" ? "#38bdf8" : "var(--ftc-blue)";
   const glow =
     accent === "red"
       ? "linear-gradient(160deg, rgba(228,0,43,0.16), rgba(228,0,43,0.02))"
-      : "linear-gradient(160deg, rgba(0,114,206,0.16), rgba(0,114,206,0.02))";
-  const borderDim = accent === "red" ? "var(--ftc-red-dim)" : "var(--ftc-blue-dim)";
+      : accent === "cyan"
+        ? "linear-gradient(160deg, rgba(56,189,248,0.16), rgba(56,189,248,0.02))"
+        : "linear-gradient(160deg, rgba(0,114,206,0.16), rgba(0,114,206,0.02))";
+  const borderDim = accent === "red" ? "var(--ftc-red-dim)" : accent === "cyan" ? "#0e4d63" : "var(--ftc-blue-dim)";
 
   return (
     <Link
@@ -34,7 +38,7 @@ function ToolCard({
         className="mt-6 inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-white/80 transition group-hover:gap-2.5"
         style={{ color }}
       >
-        Open <span aria-hidden>→</span>
+        {cta} <span aria-hidden>→</span>
       </span>
     </Link>
   );
@@ -71,10 +75,12 @@ export default function Home() {
           description="Break down match film to scout robot capabilities, tendencies, and performance trends."
           accent="blue"
         />
-        {/* Reserved for a future third tool. Intentionally not a button/link yet. */}
-        <div
-          aria-hidden
-          className="hidden rounded-2xl border border-dashed border-white/10 lg:block"
+        <ToolCard
+          href="/single-team-analysis"
+          title="Single Team Analysis"
+          description="Enter an FTC team number to generate a detailed DECODE-season report covering performance, strengths, weaknesses, consistency, strategy, and counterplay."
+          accent="cyan"
+          cta="Analyze a Team"
         />
       </div>
     </main>

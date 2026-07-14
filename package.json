@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-transform-types --test lib/scouting/*.test.ts"
+    "test": "node --experimental-transform-types --test lib/scouting/*.test.ts lib/teamAnalysis/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
