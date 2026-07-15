@@ -6,6 +6,12 @@
       "runtimeExecutable": "C:\\Users\\Sarthak\\OneDrive\\Documents\\MITProject2\\.claude\\dev-server.cmd",
       "runtimeArgs": [],
       "port": 3000
+    },
+    {
+      "name": "portfolio",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "4321", "--directory", "portfolio"],
+      "port": 4321
     }
   ]
 }

@@ -63,11 +63,16 @@ function fmtCs(t: number): string {
 // (goal tubes at ~x0.31 blue / ~x0.69 red); adjust the sliders for other angles.
 const DEFAULT_RED_ZONE: Zone = { x: 0.63, y: 0.03, w: 0.09, h: 0.4, line: 0.5 };
 const DEFAULT_BLUE_ZONE: Zone = { x: 0.28, y: 0.03, w: 0.08, h: 0.42, line: 0.5 };
-// Goal tubes sit in shadow, so sensitivity defaults are raised a little to see dim
-// balls — but NOT so high that pre-match staging, reflections or robot lights read
-// as artifacts. Push higher via the sliders only if a gate is clearly undercounting.
-const DEFAULT_RED_SENSITIVITY = 3;
-const DEFAULT_BLUE_SENSITIVITY = 2.1;
+// Goal tubes sit in shadow, so sensitivity defaults are raised to see dim balls — but
+// NOT so high that pre-match staging, reflections or robot lights read as artifacts.
+// Each gate pairs a default sensitivity with its own colour floor (see RED_COLOR_FLOORS
+// / BLUE_COLOR_FLOORS). Both tubes were under-counting because the old fixed floors
+// clamped the slider once cranked, so both now default to 4 with lower per-gate floors
+// the slider can actually reach. Always Set a match start after any intro so the
+// pre-match green graphic can't score. Push a slider higher only if that gate still
+// under-counts.
+const DEFAULT_RED_SENSITIVITY = 4;
+const DEFAULT_BLUE_SENSITIVITY = 4;
 const MAX_SENSITIVITY = 5;
 // Multi-count (clump) size — normalized area of ONE artifact in a gate crop; a
 // crossing blob bigger than ~1.6x this is scored as several balls (round(area /
@@ -96,19 +101,35 @@ function trackerCfgFrom(zone: Zone, direction: ScoringDirection, singleArtifactA
   };
 }
 
-// Higher sensitivity lowers the colour-coverage, minimum-blob-size AND the
-// saturation/brightness floors, so fainter / darker artifacts (e.g. balls in a
-// shadowed goal tube) still register as candidates. Applied per gate so a dim
-// goal can be turned up without adding noise on a bright one.
-function candidateCfgFrom(targets: ColorTarget[], sensitivity: number): CandidateConfig {
+// Saturation/brightness floor clamps, PER GATE. A pixel greyer/darker than these is
+// never classified as an artifact, so these set the hard ceiling on what a gate's
+// sensitivity slider can ever see: once 0.25/s and 0.18/s drop below the clamp, raising
+// the slider does nothing. Both goal tubes sit in shadow and were clamped at the old
+// 0.10/0.08 floors, so both under-counted their dim balls once the slider was cranked.
+// Each gate now has its own lower floor its slider can actually reach. RED sits in
+// DEEPER shadow (≈90-pt undercount) so it goes lowest; BLUE needs a gentler lift
+// (≈40-pt undercount) and must not overshoot, so its floor is only moderately lower.
+// Both tuned per gate against the da Vinci Finals 1 footage. The pre-match green intro —
+// the reason these floors were high originally — is excluded by the Match-start gate
+// instead, so set a match start after any intro before trusting a live total.
+const RED_COLOR_FLOORS = { minSat: 0.05, minVal: 0.045 };   // deeper shadow — DO NOT change without re-testing red
+const BLUE_COLOR_FLOORS = { minSat: 0.065, minVal: 0.053 }; // gentler lift for blue's ~40-pt undercount
+
+// Higher sensitivity lowers the colour-coverage, minimum-blob-size AND (down to the
+// per-gate floor) the saturation/brightness floors, so fainter / darker artifacts
+// (e.g. balls in a shadowed goal tube) still register as candidates. Applied per gate
+// so a dim goal can be turned up without adding noise on a bright one.
+function candidateCfgFrom(
+  targets: ColorTarget[],
+  sensitivity: number,
+  floors: { minSat: number; minVal: number } = BLUE_COLOR_FLOORS,
+): CandidateConfig {
   const s = Math.max(0.5, sensitivity);
-  // Floors keep a real (dim) ball detectable while rejecting washed-out greys, shadow
-  // and reflections — so cranking sensitivity finds faint balls without inventing them.
   return {
     ...DEFAULT_CANDIDATE_CONFIG,
     targets,
-    minSat: Math.max(0.1, 0.25 / s),
-    minVal: Math.max(0.08, 0.18 / s),
+    minSat: Math.max(floors.minSat, 0.25 / s),
+    minVal: Math.max(floors.minVal, 0.18 / s),
     minCoverage: 0.03 / s,
     minAreaFrac: 0.012 / s,
   };
@@ -411,9 +432,9 @@ export default function AutoScoutingPage() {
     [],
   );
 
-  const paintMask = useCallback((mask: HTMLCanvasElement | null, data: Uint8ClampedArray | null, w: number, h: number, sensitivity: number) => {
+  const paintMask = useCallback((mask: HTMLCanvasElement | null, data: Uint8ClampedArray | null, w: number, h: number, sensitivity: number, floors: { minSat: number; minVal: number }) => {
     if (!mask || !data || w === 0 || h === 0) return;
-    const m = computeMaskImage(data, w, h, candidateCfgFrom(colorTargetsRef.current, sensitivity));
+    const m = computeMaskImage(data, w, h, candidateCfgFrom(colorTargetsRef.current, sensitivity, floors));
     mask.width = w;
     mask.height = h;
     const c = mask.getContext("2d");
@@ -493,7 +514,7 @@ export default function AutoScoutingPage() {
     let stopped = false;
 
     const processFrame = (mediaTime: number) => {
-      const redCfg = candidateCfgFrom(colorTargetsRef.current, redSensRef.current);
+      const redCfg = candidateCfgFrom(colorTargetsRef.current, redSensRef.current, RED_COLOR_FLOORS);
       const blueCfg = candidateCfgFrom(colorTargetsRef.current, blueSensRef.current);
       // Buzzer: at match end, stop scoring, pause playback, and show results (once).
       const mEnd = matchEndRef.current;
@@ -557,8 +578,8 @@ export default function AutoScoutingPage() {
         const now = Date.now();
         drawCropWithOverlay(redCropRef.current, rs.data, rs.w, rs.h, redCands, redZone.line, redDir, now - d.red.flashWall < 700);
         drawCropWithOverlay(blueCropRef.current, bs.data, bs.w, bs.h, blueCands, blueZone.line, blueDir, now - d.blue.flashWall < 700);
-        paintMask(redMaskRef.current, rs.data, rs.w, rs.h, redSensRef.current);
-        paintMask(blueMaskRef.current, bs.data, bs.w, bs.h, blueSensRef.current);
+        paintMask(redMaskRef.current, rs.data, rs.w, rs.h, redSensRef.current, RED_COLOR_FLOORS);
+        paintMask(blueMaskRef.current, bs.data, bs.w, bs.h, blueSensRef.current, BLUE_COLOR_FLOORS);
       }
     };
 
@@ -617,7 +638,7 @@ export default function AutoScoutingPage() {
     setShowReport(false);
     video.pause();
 
-    const redCfg = candidateCfgFrom(colorTargetsRef.current, redSensRef.current);
+    const redCfg = candidateCfgFrom(colorTargetsRef.current, redSensRef.current, RED_COLOR_FLOORS);
     const blueCfg = candidateCfgFrom(colorTargetsRef.current, blueSensRef.current);
     const redTracker = new GateMultiTracker(trackerCfgFrom(redZone, redDir, redSingleRef.current, DEFAULT_RED_MAX_CLUMP));
     const blueTracker = new GateMultiTracker(trackerCfgFrom(blueZone, blueDir, blueSingleRef.current, DEFAULT_BLUE_MAX_CLUMP));
@@ -745,7 +766,7 @@ export default function AutoScoutingPage() {
   function analyzeCurrentFrame() {
     const v = videoRef.current;
     if (!v) return;
-    const redCfg = candidateCfgFrom(colorTargetsRef.current, redSensRef.current);
+    const redCfg = candidateCfgFrom(colorTargetsRef.current, redSensRef.current, RED_COLOR_FLOORS);
     const blueCfg = candidateCfgFrom(colorTargetsRef.current, blueSensRef.current);
     const rs = sampleZone(v, redZone);
     const bs = sampleZone(v, blueZone);
@@ -765,8 +786,8 @@ export default function AutoScoutingPage() {
 
     drawCropWithOverlay(redCropRef.current, rs.data, rs.w, rs.h, redCands, redZone.line, redDir, false);
     drawCropWithOverlay(blueCropRef.current, bs.data, bs.w, bs.h, blueCands, blueZone.line, blueDir, false);
-    paintMask(redMaskRef.current, rs.data, rs.w, rs.h, redSensRef.current);
-    paintMask(blueMaskRef.current, bs.data, bs.w, bs.h, blueSensRef.current);
+    paintMask(redMaskRef.current, rs.data, rs.w, rs.h, redSensRef.current, RED_COLOR_FLOORS);
+    paintMask(blueMaskRef.current, bs.data, bs.w, bs.h, blueSensRef.current, BLUE_COLOR_FLOORS);
     setDiag({ ...d, red: { ...d.red }, blue: { ...d.blue }, log: [...d.log] });
   }
 
