@@ -30,7 +30,7 @@ export interface ScoreEvent {
   method: DetectionMethod;
   status: ReviewStatus;
   confidence: Confidence;
-  source?: "gate_detection" | "manual" | "test"; // provenance for the debug log
+  source?: "ramp_queue" | "scoreboard" | "gate_detection" | "manual" | "test"; // provenance for the debug log
   zoneX?: number; // centre-x of the crossing within the crop (de-dups replays)
   trackId?: number;
   count?: number; // artifacts represented by this event (>1 for a merged clump)

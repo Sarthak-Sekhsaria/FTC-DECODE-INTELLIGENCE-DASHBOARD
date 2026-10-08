@@ -1,6 +1,6 @@
 "use client";
 
-import { type RefObject } from "react";
+import { type ReactNode, type RefObject } from "react";
 import type { ScoringDirection } from "@/lib/scouting/cvDetector";
 import type { AllianceColor } from "@/lib/scouting/autoTypes";
 
@@ -125,6 +125,7 @@ export default function DebugPanel({
   onAnalyzeFrame,
   onClearDetections,
   onExport,
+  rampSection,
 }: {
   diag: Diag;
   redArtifacts: number;
@@ -148,6 +149,7 @@ export default function DebugPanel({
   onAnalyzeFrame: () => void;
   onClearDetections: () => void;
   onExport: () => void;
+  rampSection?: ReactNode; // RAMP queue counter view; replaces the gate-line cards when set
 }) {
   return (
     <div className="rounded-2xl border p-4" style={{ borderColor: "var(--scout-accent-dim)", background: "var(--scout-panel)" }}>
@@ -160,6 +162,8 @@ export default function DebugPanel({
         </span>
       </div>
 
+      {rampSection ?? (
+      <>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <GateCard
           color="var(--scout-red)"
@@ -202,6 +206,8 @@ export default function DebugPanel({
             onChange={(e) => onBlueSingleChange(Number(e.target.value))} style={{ accentColor: "var(--scout-blue)" }} />
         </label>
       </div>
+      </>
+      )}
 
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" onClick={() => onTest("red")} className="chip" style={{ borderColor: "var(--scout-red)", color: "var(--scout-red)" }}>

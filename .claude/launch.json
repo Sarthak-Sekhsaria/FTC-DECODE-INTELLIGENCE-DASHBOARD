@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "ftc-decode-predictor",
-      "runtimeExecutable": "C:\\Users\\Sarthak\\OneDrive\\Documents\\MITProject2\\.claude\\dev-server.cmd",
-      "runtimeArgs": [],
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
+      "runtimeArgs": ["run", "dev"],
       "port": 3000
     },
     {

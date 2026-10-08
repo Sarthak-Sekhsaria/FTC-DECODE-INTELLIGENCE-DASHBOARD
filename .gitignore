@@ -47,3 +47,7 @@ next-env.d.ts
 
 # generated scouting output (runtime data, not source)
 /Team_Descriptions
+
+# python
+__pycache__/
+*.pyc

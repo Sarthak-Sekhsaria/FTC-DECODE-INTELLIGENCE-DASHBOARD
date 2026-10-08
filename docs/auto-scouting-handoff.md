@@ -1,5 +1,18 @@
 # Auto Scouting — Full Technical Handoff
 
+> **Update (Sept 2026):** the goal zones are no longer placed by hand. They are placed
+> automatically over each RAMP when a video loads (AprilTags / whole-field-model alignment —
+> GOAL colours, floor, tape — / 4-tap / drag), from any camera angle,
+> and the `DEFAULT_*_ZONE` constants below are now only placeholders. See
+> [`auto-roi-placement.md`](auto-roi-placement.md). The zone and sensitivity values in §10
+> predate this change.
+>
+> **Update (29 Sept 2026):** when placement found a camera pose, counting no longer uses the
+> scoring-line detector described below. It reads the RAMP's queue of ARTIFACTS instead, with
+> automatic per-video calibration (colours, sensitivity, clump size) and camera following:
+> see [`auto-ramp-counting.md`](auto-ramp-counting.md). The gate-line detector below is kept
+> as the legacy engine, used for hand-drawn boxes (no pose) or when chosen in Debug.
+
 Written as a complete-context dump so work can resume on Auto Scouting with zero
 prior conversation history. Everything below reflects the **actual current code**
 (read fresh from disk, not memory) as of this writing. Covers only Auto Scouting —

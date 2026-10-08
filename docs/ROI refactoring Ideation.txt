@@ -1,0 +1,142 @@
+ROI refactoring Ideation :
+
+
+in the auto scoutng page after the user loads in the video the roi is just static over there and the user has to change its position manually , so make the ROI place itself automatically over the ramp as soon as a video is loaded, from any camera angle (overhead, high stands angle, low side angle, phone held at the field wall). The existing counting logic (the dual-threshold detection line inside the ROI) must keep working unchanged. This task only changes where the ROI goes and how it gets there.
+
+## Field dimensions come ONLY from the game manual
+I am giving you the full DECODE game manual. Every field measurement, AprilTag ID,
+AprilTag family, tag size, tag mounting position, tile size, goal geometry and ramp
+geometry must be taken from that manual. Do not invent, estimate or "typical-value"
+any field dimension. If the manual does not state a value you need, stop and list
+exactly what is missing and where you looked, instead of guessing. For every value
+you take from the manual, put a comment next to it citing the section/figure it
+came from, so I can check it.
+
+## Core design: one 3D field model, several ways to find the camera
+Every placement method estimates the camera's pose (its position and rotation
+relative to the field), then projects the known 3D ramp points into the image. Build
+these shared pieces once and have every method use them.
+
+### 1. Field model (a separate data file, e.g. `field_model.json`)
+- Coordinate system: inches, origin at the field center, x toward the red alliance
+  side, y along the other horizontal axis, z pointing up. Document this at the top
+  of the file.
+- Contents, all from the manual:
+  - the field perimeter corners at z = 0, each labelled by which alliance/goal
+    it is nearest to
+  - the tile grid (tile size and seam positions)
+  - for each AprilTag: its ID, and its 4 corners in 3D, listed in the same corner
+    order the tag detector outputs (state that order in the file)
+  - for each ramp (red and blue): the 3D corners of the region the ROI should cover
+  - the goal structures' outlines (used for sanity checks and debug drawing)
+- Loading code validates the file: every required field present, tag corners form
+  a square of the manual's tag size, ramp corners are 4 distinct points.
+
+### 2. Camera intrinsics (how this camera turns 3D into 2D)
+- Assume the principal point is at the image center and there is no lens
+  distortion.
+- Estimate the focal length from an assumed horizontal field of view. Starting
+  default: 70° (configurable, this is a camera assumption, not a field value).
+- When a method yields 6 or more correspondences, refine the focal length: try a
+  range of candidate FOVs, solve the pose for each, and keep the one with the
+  lowest reprojection error.
+
+### 3. Pose + projection
+- Input: a list of 2D image points matched to 3D field points.
+- Solve the pose with solvePnP. With more than 4 points, use the RANSAC variant so
+  a few bad matches don't wreck the result.
+- Project the ramp's 3D corners with projectPoints.
+- Output: the ROI as normalized coordinates (fractions 0–1 of the native video
+  frame), the pose, and the mean reprojection error (average pixel distance between
+  where the known points were detected and where the solved pose says they should
+  be). The reprojection error is the confidence score.
+- Sanity checks before accepting: the projected ROI is convex, at least mostly
+  inside the frame, and not absurdly large or small relative to the frame. Reject
+  otherwise.
+
+### 4. Which ramp(s)
+- Compute an ROI for every ramp whose projection passes the sanity checks.
+- If both ramps are visible, create both ROIs, each tagged with its alliance
+  colour, so counting can run per alliance.
+- If only one is visible, create only that one and show which alliance it belongs
+  to.
+
+## Placement methods, tried in this order
+
+### A. AprilTag anchor (best for angled and side views)
+- Detect AprilTags of the family specified in the manual.
+- Run detection on the full frame. If nothing is found, retry on upscaled crops of
+  regions likely to contain goals (e.g. the frame's corners and upper half), because
+  tags are often small in wide shots.
+- Use every detected tag whose ID exists in the field model. Each gives 4
+  correspondences; more tags means a better pose.
+- Accept only if the smallest used tag is at least ~20 px per side and the
+  reprojection error is under a threshold (both configurable defaults).
+
+### B. Field-plane anchor (best for overhead and high views, where tags are
+edge-on or too small)
+- Segment the tile floor region.
+- Run line detection inside and along its boundary, cluster lines into the two
+  dominant grid directions, and compute their intersections.
+- Match intersections to the field model's tile grid. The matching is ambiguous
+  (the grid looks the same shifted by one tile, and the field has rotational
+  symmetry), so:
+  - try grid offsets and rotations, and pick the one with the lowest reprojection
+    error
+  - break the rotation ambiguity using the goals' colours: find the red and blue
+    goal structures by colour and require that the chosen orientation puts each
+    goal where the field model says it is
+- Require at least 6 non-collinear matched points. Solve the pose as in step 3.
+- Use full pose (not a floor-plane homography), because the ramp is raised above
+  the floor and a homography would misplace it.
+
+### C. Guided 4-tap fallback
+- If A and B both fail, show a prompt: "Tap the 4 field corners."
+- Show a small field diagram highlighting which corner to tap next, starting from
+  the corner nearest the red goal and going clockwise as seen from above.
+- Let the user undo a tap. After 4 taps, solve the pose from those correspondences
+  and project the ramps as normal.
+
+### D. Manual drag (always available)
+- Keep the existing drag-to-place ROI.
+- Any drag or resize converts back to normalized coordinates and overrides the
+  automatic result for this session.
+
+## Stability rules
+- Run placement over the first ~30 usable frames (default, configurable). For each
+  ROI corner, take the median across frames (median, not mean, so a few bad frames
+  don't drag it), then **lock** the ROI.
+- Do not run placement while counting is running.
+- Camera-moved check: keep a small set of tracked feature points from the lock
+  frame. Periodically compare against the current frame; if most of them have
+  shifted consistently beyond a threshold, unlock and re-run placement. A robot
+  covering a tag or a few features must NOT trigger a re-run.
+- After placement, show the projected ROI(s) with the method used (A/B/C) and the
+  confidence. The user confirms, or nudges and then confirms, before counting
+  starts.
+- Save the confirmed ROI(s), the pose, the FOV used and the method for each
+  video/session, so reopening the same video restores them instantly.
+
+## UI states on the auto scouting page
+1. Video loaded → "Finding field…" indicator while placement runs.
+2. Success → ROI(s) drawn with method + confidence, Confirm button.
+3. Low confidence → ROI drawn in a warning colour, message suggesting the user
+   check or nudge it.
+4. A and B failed → go straight to the 4-tap flow.
+5. Confirmed → counting can start.
+
+## Leave hooks only (do not build now)
+- A future trained keypoint model for field or ramp corners, which slots in as
+  method B2 using the same correspondence → pose → projection path.
+
+## Debug mode
+Add a toggle that draws on the frame:
+- detected AprilTags with their IDs
+- detected grid lines and intersections
+- the full field model reprojected with the solved pose (perimeter, tile grid,
+  goals) so misalignment is obvious at a glance
+- the final ROI(s)
+- the method used, reprojection error and FOV as text
+
+I will test with overhead, high stands, low side and field-wall phone videos. For
+each test video, log which method succeeded and its reprojection error.

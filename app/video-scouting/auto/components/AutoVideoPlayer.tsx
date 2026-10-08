@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type RefObject } from "react";
+import { useRef, useState, type ReactNode, type RefObject } from "react";
 
 export interface Zone {
   x: number; // normalized 0..1 (left)
@@ -19,20 +19,59 @@ function fmt(t: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+// Manual placement (method D): drag the box to move it, drag the corner handle to
+// resize it. Coordinates are converted back to normalized 0..1 of the frame.
+function useZoneDrag(zone: Zone, onChange?: (z: Zone) => void) {
+  const start = useRef<{ x: number; y: number; zone: Zone; mode: "move" | "resize"; w: number; h: number } | null>(null);
+  const begin = (mode: "move" | "resize") => (e: React.PointerEvent<HTMLElement>) => {
+    if (!onChange) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const box = (e.currentTarget.closest("[data-zone-frame]") as HTMLElement | null)?.getBoundingClientRect();
+    if (!box) return;
+    start.current = { x: e.clientX, y: e.clientY, zone, mode, w: box.width, h: box.height };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const move = (e: React.PointerEvent<HTMLElement>) => {
+    const s = start.current;
+    if (!s || !onChange) return;
+    const dx = (e.clientX - s.x) / s.w;
+    const dy = (e.clientY - s.y) / s.h;
+    const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+    if (s.mode === "move") {
+      onChange({ ...s.zone, x: clamp(s.zone.x + dx, 0, 1 - s.zone.w), y: clamp(s.zone.y + dy, 0, 1 - s.zone.h) });
+    } else {
+      onChange({ ...s.zone, w: clamp(s.zone.w + dx, 0.02, 1 - s.zone.x), h: clamp(s.zone.h + dy, 0.02, 1 - s.zone.y) });
+    }
+  };
+  const end = () => {
+    start.current = null;
+  };
+  return { begin, move, end };
+}
+
 function ZoneOverlay({
   zone,
   color,
   label,
   direction,
+  onChange,
 }: {
   zone: Zone;
   color: string;
   label: string;
   direction: "downward" | "upward";
+  onChange?: (z: Zone) => void;
 }) {
+  const drag = useZoneDrag(zone, onChange);
   return (
     <div
-      className="pointer-events-none absolute"
+      className={onChange ? "absolute z-[6] cursor-move touch-none" : "pointer-events-none absolute"}
+      onPointerDown={drag.begin("move")}
+      onPointerMove={drag.move}
+      onPointerUp={drag.end}
+      onPointerCancel={drag.end}
+      title={onChange ? "Drag to move · drag the corner to resize" : undefined}
       style={{
         left: `${zone.x * 100}%`,
         top: `${zone.y * 100}%`,
@@ -60,6 +99,16 @@ function ZoneOverlay({
       >
         {direction === "downward" ? "▼" : "▲"}
       </span>
+      {onChange && (
+        <span
+          className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-nwse-resize rounded-sm border border-black"
+          style={{ background: color }}
+          onPointerDown={drag.begin("resize")}
+          onPointerMove={drag.move}
+          onPointerUp={drag.end}
+          onPointerCancel={drag.end}
+        />
+      )}
     </div>
   );
 }
@@ -79,6 +128,10 @@ export default function AutoVideoPlayer({
   onSample,
   redDir,
   blueDir,
+  redEnabled = true,
+  blueEnabled = true,
+  onZoneChange,
+  overlay,
 }: {
   videoUrl: string | null;
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -94,6 +147,10 @@ export default function AutoVideoPlayer({
   onSample: (nx: number, ny: number) => void;
   redDir: "downward" | "upward";
   blueDir: "downward" | "upward";
+  redEnabled?: boolean; // false when that alliance's ramp is not in view
+  blueEnabled?: boolean;
+  onZoneChange?: (alliance: "red" | "blue", z: Zone) => void; // enables drag/resize
+  overlay?: ReactNode; // placement overlay (ROI quads, 4-tap flow, debug)
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -164,12 +221,17 @@ export default function AutoVideoPlayer({
         {/* Container matches the real video aspect ratio so object-contain does not
             letterbox — this keeps the zone overlays aligned pixel-for-pixel with the
             same normalized region the CV samples from the frame. */}
-        <div className="relative mx-auto w-full" style={{ aspectRatio: videoAspect > 0 ? videoAspect : 16 / 9 }}>
+        <div data-zone-frame className="relative mx-auto w-full" style={{ aspectRatio: videoAspect > 0 ? videoAspect : 16 / 9 }}>
           <video ref={videoRef} src={videoUrl} controls playsInline className="h-full w-full object-contain" />
+          {overlay}
           {showOverlays && (
             <>
-              <ZoneOverlay zone={redZone} color="var(--scout-red)" label="Red goal" direction={redDir} />
-              <ZoneOverlay zone={blueZone} color="var(--scout-blue)" label="Blue goal" direction={blueDir} />
+              {redEnabled && (
+                <ZoneOverlay zone={redZone} color="var(--scout-red)" label="Red ramp" direction={redDir} onChange={onZoneChange && ((z) => onZoneChange("red", z))} />
+              )}
+              {blueEnabled && (
+                <ZoneOverlay zone={blueZone} color="var(--scout-blue)" label="Blue ramp" direction={blueDir} onChange={onZoneChange && ((z) => onZoneChange("blue", z))} />
+              )}
             </>
           )}
           {samplingColor && (

@@ -1,0 +1,20 @@
+Changes to Artifact IQ :
+
+1 . Add ml layering 
+2. Add dectetion software in which the robots can be easily identified
+3. Add detection software for penalties
+4. Add Apriltag dectection at the start of the match to scan pattern 
+5. Pattern should also be added 
+
+
+Change 1 :
+
+The app should resize its shape to fit comfortable on a mobile screen without compromising on user friendly interaction and easy to press buttons , When a user switches to laptop to should rezise automatically , If this is not automatically possible then add a page before the user enters the real ui of the manual and auto scoting oages asking if they are on laptop or mobile 
+
+Change 2 ;
+
+When the user puts in the video they want to scout it should automatically fit the roi to the gate of the ftc field where we actually detect the artifacts going in , by gate I mean the ramp we see after the ball enters the goal , the logic behind the roi stays the same exept that no human should be required to automatically shift the roi to the ramp themselves , this roi positioning should return good results as well once implemented keep testing until you get it right . The size and all of the other things should also be right 
+
+Change 3 :
+
+After the ROI is sorted out the user has to set so many other parameters , in the official arena there will be no time to configure all of this , look at all the factors which affect the different things the user has to manually enter to get best results like the sensitivity for each roi and the clump rate which is inside the debug mode 

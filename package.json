@@ -7,11 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-transform-types --test lib/scouting/*.test.ts lib/teamAnalysis/*.test.ts"
+    "test": "node --experimental-transform-types --no-warnings --test lib/scouting/*.test.ts lib/scouting/placement/*.test.ts lib/teamAnalysis/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
+    "@techstark/opencv-js": "^4.12.0-release.1",
     "next": "16.2.10",
+    "onnxruntime-web": "^1.30.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
